@@ -10,6 +10,9 @@ from pm4py.visualization.petrinet import visualizer as pn_visualizer
 from pm4py.visualization.process_tree import visualizer as pt_visualizer
 from pm4py.visualization.heuristics_net import visualizer as hn_visualizer
 from pm4py.visualization.dfg import visualizer as dfg_visualization
+from pm4py.algo.evaluation.replay_fitness import algorithm as replay_fitness_evaluator
+from pm4py.algo.evaluation.precision import algorithm as precision_evaluator
+from pm4py.algo.evaluation.generalization import algorithm as generalization_evaluator
 
 def compare_alg(df):
     # конвертация DataFrame в логи
@@ -19,6 +22,13 @@ def compare_alg(df):
     net, initial_marking, final_marking = alpha_miner.apply(log)
     gviz = pn_visualizer.apply(net, initial_marking, final_marking)
     pn_visualizer.view(gviz)
+    # получение оценок для Alpha алгоритма
+    gen = generalization_evaluator.apply(log, net, initial_marking, final_marking)
+    prec = precision_evaluator.apply(log, net, initial_marking, final_marking, variant=precision_evaluator.Variants.ALIGN_ETCONFORMANCE)
+    # prec = precision_evaluator.apply(log, net, im, fm, variant=precision_evaluator.Variants.ETCONFORMANCE_TOKEN)
+    # fitness = replay_fitness_evaluator.apply(log, net, im, fm, variant=replay_fitness_evaluator.Variants.ALIGNMENT_BASED)
+    fitness = replay_fitness_evaluator.apply(log, net, initial_marking, final_marking, variant=replay_fitness_evaluator.Variants.ALIGNMENT_BASED)
+    alpha_metrics = [gen, prec, fitness]
 
     # Построение DFG Графа
     dfg = dfg_discovery.apply(log)
@@ -30,11 +40,34 @@ def compare_alg(df):
     tree = inductive_miner.apply_tree(log)
     gviz = pt_visualizer.apply(tree)
     pt_visualizer.view(gviz)
+    # получение оценок для индуктивного метода
+    gen = generalization_evaluator.apply(log, net, initial_marking, final_marking)
+    prec = precision_evaluator.apply(log, net, initial_marking, final_marking, variant=precision_evaluator.Variants.ALIGN_ETCONFORMANCE)
+    # prec = precision_evaluator.apply(log, net, im, fm, variant=precision_evaluator.Variants.ETCONFORMANCE_TOKEN)
+    # fitness = replay_fitness_evaluator.apply(log, net, im, fm, variant=replay_fitness_evaluator.Variants.ALIGNMENT_BASED)
+    fitness = replay_fitness_evaluator.apply(log, net, initial_marking, final_marking, variant=replay_fitness_evaluator.Variants.ALIGNMENT_BASED)
+    inductive_metrics = [gen, prec, fitness]
 
     # применение Эвристического метода обнаружения процессов
     heu_net = heuristics_miner.apply_heu(log, parameters={heuristics_miner.Variants.CLASSIC.value.Parameters.DEPENDENCY_THRESH: 0.99})
     gviz = hn_visualizer.apply(heu_net)
     hn_visualizer.view(gviz)
+    # получение оценок для Эвристического метода
+    gen = generalization_evaluator.apply(log, net, initial_marking, final_marking)
+    prec = precision_evaluator.apply(log, net, initial_marking, final_marking, variant=precision_evaluator.Variants.ALIGN_ETCONFORMANCE)
+    # prec = precision_evaluator.apply(log, net, im, fm, variant=precision_evaluator.Variants.ETCONFORMANCE_TOKEN)
+    # fitness = replay_fitness_evaluator.apply(log, net, im, fm, variant=replay_fitness_evaluator.Variants.ALIGNMENT_BASED)
+    fitness = replay_fitness_evaluator.apply(log, net, initial_marking, final_marking, variant=replay_fitness_evaluator.Variants.ALIGNMENT_BASED)
+    heuristics_metrics = [gen, prec, fitness]
+
+    compare_algorithms = pd.DataFrame(index=['Fitness', 'Precision', 'Generalization'])
+    compare_algorithms['Alpha'] = alpha_metrics
+    compare_algorithms['Inductive'] = inductive_metrics
+    compare_algorithms['Heuristics'] = heuristics_metrics
+    
+    # поиск наилучшего алгоритма
+    best = compare_algorithms.mean(axis=0).idxmax()
+    return best
 
 # функция преобразования журнала событий
 # в формат необходимый для применения Process mining
@@ -47,6 +80,7 @@ def csv_to_logs(df):
     data_frame = data_frame.sort_values('time:timestamp')
     return data_frame
 
+# get_paths, get_all_paths - иерархи событий
 def get_paths(df, find):
     sequences = [find]
     first = find
@@ -64,7 +98,6 @@ def get_paths(df, find):
             sequences2.append(seq)
 
     # удалим из цепочек событий, те которые входя в более крупные
-    # этого пока нет и хрен знает как реализовать
     sequences2 = max(sequences2, key=len)
     return sequences2
 
