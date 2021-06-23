@@ -2,6 +2,9 @@ import pandas as pd
 from lxml import etree as et
 import re
 
+# функция, которая принимает на вход журналы событий ОС Windows,
+# полученные с помощью Sysmon в формате XML
+# и преобразует события в формат CSV
 def xml_to_df(xml_file):
     
     root = et.parse(xml_file).getroot()
@@ -83,6 +86,8 @@ def xml_to_df(xml_file):
                     'events': pd.Series(events)})
     return df
 
+# Функция, которая дополняет журналы событий
+# необходимыми парметрами
 def xml_to_df2(df):
     df['UtcTime'] = ''
     df['CommandLine'] = ''

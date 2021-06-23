@@ -1,0 +1,1 @@
+Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-Sysmon/Operational"; StartTime=((Get-Date).AddHours(-2))} | Export-Clixml "sysmon_logs_last.xml"
